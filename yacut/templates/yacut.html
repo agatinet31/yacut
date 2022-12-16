@@ -43,14 +43,14 @@
         </div>
       </div>
     </div>
-    {% if urlmap.custom_id %}
+    {% if form.custom_id.data %}
     <div class="container">
       <div class="row ">
         <div class="col-sm"></div>
         <div class="col-sm">
           <p class="text-center">
-            <h5 class="text-center">Ваша новая ссылка готова:</h5>
-            <a href="{{ url_for('index_view', index_view=opinion.id, _external=True) }}">{{ url_for('opinion_view', id=opinion.id, _external=True) }}</a>
+            <h5 class="text-center">Ваша новая ссылка готова:</h5>            
+            <a href="{{ url_for('redirect_view', custom_id=form.custom_id.data, _external=True) }}">{{ url_for('index_view', _external=True) }}{{ form.custom_id.data }}</a>
           </p>
         </div>
         <div class="col-sm"></div>

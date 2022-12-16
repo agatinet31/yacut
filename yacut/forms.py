@@ -3,17 +3,20 @@ from wtforms import StringField, SubmitField, URLField
 from wtforms.validators import DataRequired, Length, Optional, Regexp
 
 
-class OpinionForm(FlaskForm):
+class UrlMapForm(FlaskForm):
     """Класс формы для ввода ссылки."""
     original_link = URLField(
         'Длинная ссылка',
-        validators=[DataRequired(Length(1, 256), message='Обязательное поле')]
+        validators=[
+            DataRequired(message='Обязательное поле'),
+            Length(1, 256)
+        ]
     )
     custom_id = StringField(
         'Ваш вариант короткой ссылки',
         validators=[
-            Length(1, 16, message='Длина короткого идентификатора не более 16 символов'),
             Optional(),
+            Length(1, 16, message='Длина короткого идентификатора не более 16 символов'),
             Regexp(r'[a-zA-Z\d]+', message='Короткий идентификатор должен содержать только латинские буквы или цифры')
         ]
     )
