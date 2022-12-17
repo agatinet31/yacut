@@ -1,31 +1,48 @@
 from http import HTTPStatus
 
 from flask import jsonify, render_template
-from sqlalchemy.exc import DatabaseError
+from sqlalchemy.exc import DatabaseError as YacutDataBaseError
 
 from yacut import app, db
 
 
 class InvalidAPIError(Exception):
+    """Класс обработки исключений при обработке API."""
     status_code = 400
 
     def __init__(self, message, status_code=None):
-        super().__init__()
         self.message = message
         if status_code is not None:
             self.status_code = status_code
+        super().__init__()
 
     def to_dict(self):
         return dict(message=self.message)
 
 
 class UniqueShortIDError(Exception):
-
+    """Класс исключения уникальности для короткого идентификатора."""
     def __init__(self, short_id):
+        self.short_id = short_id
         super().__init__(
             f'Имя {short_id} уже занято!'
         )
-        self.short_id = short_id
+
+
+class YacutAppendUrlMapError(YacutDataBaseError):
+    """
+    Класс исключения для операции добавления в БД
+    сопоставления оригинального URL и короткого идентификатора.
+    """
+    def __init__(self, original, short):
+        self.original = original
+        self.short = short
+        super().__init__(
+            'Ошибка при работа с БД. '
+            'Операция добавления короткой ссылки не выполнена!'
+            f'Оригинальная ссылка: {original}'
+            f'Короткий идентификатор: {short}'
+        )
 
 
 @app.errorhandler(InvalidAPIError)
@@ -42,9 +59,3 @@ def page_not_found(error):
 def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), HTTPStatus.INTERNAL_SERVER_ERROR.value
-
-
-@app.errorhandler(DatabaseError)
-def database_error(error):
-    app.logger.error(f'Ошибка работы с БД: {error}')
-    return render_template('500.html'), 500

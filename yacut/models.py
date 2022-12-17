@@ -1,16 +1,15 @@
 from datetime import datetime
 
 from yacut import db
-from yacut.utils import get_unique_short_id
-from yacut.error_handlers import UniqueShortIDError
 
 
-class YacutModel(db.Model):
+class YacutBaseModel(db.Model):
     """Базовый класс модели."""
     __abstract__ = True
     id = db.Column(db.Integer, primary_key=True)
 
     def __iter__(self):
+        """Итератор полей и их значений."""
         values = vars(self)
         for attr in self.__mapper__.columns.keys():
             if attr in values:
@@ -25,21 +24,8 @@ class YacutModel(db.Model):
         self.__dict__.update(data)
 
 
-class URLMap(YacutModel):
+class URLMap(YacutBaseModel):
     """Класс модели отображения коротких ссылок."""
     original = db.Column(db.String(256))
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-
-
-def append_urlmap(original, short=None):
-    if not short:
-        short = get_unique_short_id()
-    if URLMap.query.filter_by(short=short).first():
-        raise UniqueShortIDError
-    urlmap = URLMap(
-        original=original,
-        short=short
-    )
-    db.session.add(urlmap)
-    db.session.commit()
