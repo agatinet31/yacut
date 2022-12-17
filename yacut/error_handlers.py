@@ -8,7 +8,7 @@ from yacut import app, db
 
 class InvalidAPIError(Exception):
     """Класс обработки исключений при обработке API."""
-    status_code = 400
+    status_code = HTTPStatus.BAD_REQUEST.value
 
     def __init__(self, message, status_code=None):
         self.message = message
@@ -39,9 +39,11 @@ class YacutAppendUrlMapError(YacutDataBaseError):
         self.short = short
         super().__init__(
             'Ошибка при работа с БД. '
-            'Операция добавления короткой ссылки не выполнена!'
-            f'Оригинальная ссылка: {original}'
-            f'Короткий идентификатор: {short}'
+            'Операция добавления короткой ссылки не выполнена! '
+            f'Оригинальная ссылка: {original} '
+            f'Короткий идентификатор: {short}',
+            self.orig,
+            self.params
         )
 
 

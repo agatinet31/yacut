@@ -19,7 +19,7 @@ def index_view():
                 form.custom_id.data
             )
     except UniqueShortIDError as exc:
-        flash(exc)
+        flash(str(exc))
     except YacutAppendUrlMapError:
         app.logger.exception(
             'Добавление нового сопоставления '

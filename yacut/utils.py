@@ -33,5 +33,6 @@ def append_urlmap(original, short=None):
         )
         db.session.add(urlmap)
         db.session.commit()
+        return urlmap
     except DatabaseError as exc:
         raise YacutAppendUrlMapError(original, short) from exc
