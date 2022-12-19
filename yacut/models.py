@@ -1,12 +1,31 @@
 from datetime import datetime
 
+from sqlalchemy.exc import DatabaseError
+
 from yacut import db
+from yacut.error_handlers import UniqueShortIDError, YacutAppendUrlMapError
+from yacut.models import URLMap
+from yacut.utils import get_random_short_id
 
 
 class YacutBaseModel(db.Model):
     """Базовый класс модели."""
     __abstract__ = True
     id = db.Column(db.Integer, primary_key=True)
+
+    @classmethod
+    def get_by_id(cls, id):
+        """Возвращает объект по идентификатору."""
+        return cls.query.get_or_404(id)
+
+    @classmethod
+    def get_records_by_filter(cls, filter):
+        return cls.query.filter_by(**filter)
+
+    def save(self):
+        """Сохраняет изменения в БД."""
+        db.session.add(self)
+        db.session.commit()
 
     def __iter__(self):
         """Итератор полей и их значений."""
@@ -29,3 +48,52 @@ class URLMap(YacutBaseModel):
     original = db.Column(db.String(256))
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+
+    @classmethod
+    def get_by_short(cls, short):
+        """Возвращает запись по короткому идентификатору."""
+        return cls.get_records_by_filter(short=short).first()
+
+    @classmethod
+    def get_by_original(cls, original):
+        """Возвращает список записей по оригинальной ссылке."""
+        return cls.get_records_by_filter(original=original)
+
+    @classmethod
+    def is_short_exists(cls, short):
+        """Проверка наличия короткого идентификатора в таблице."""
+        return cls.get_by_short(short) is not None
+
+    @classmethod
+    def get_unique_short_id(cls):
+        """Возвращает уникальный короткий идентификатор длиной 6 символов."""
+        short_id = get_random_short_id(6)
+        return (
+            short_id
+            if not cls.is_short_exists(short_id)
+            else cls.get_unique_short_id()
+        )
+
+    @classmethod
+    def append_urlmap(cls, original, short_id=None):
+        """
+        Добавление нового сопоставления
+        между оригинальной ссылкой и коротким идентификатором.
+        """
+        try:
+            if short_id is None:
+                short_id = cls.get_unique_short_id()
+            if cls.is_short_exists(short_id):
+                raise UniqueShortIDError(short_id)
+            urlmap = cls(
+                original=original,
+                short=short_id
+            )
+            urlmap.save()
+            return urlmap
+        except DatabaseError as exc:
+            raise YacutAppendUrlMapError(original, short_id) from exc
+
+    def __repr__(self):
+        """Возвращает строковое представление объекта."""
+        return f'{self.short} : {self.original}'
