@@ -56,6 +56,7 @@ class URLMap(YacutBaseModel):
     @classmethod
     def get_by_short(cls, short):
         """Возвращает запись по короткому идентификатору."""
+        query.filter_by
         return cls.get_records_by_filter(short=short).first()
 
     @classmethod
