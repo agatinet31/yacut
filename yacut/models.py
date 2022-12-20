@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from sqlalchemy.exc import DatabaseError
+from sqlalchemy.orm.exc import NoResultFound
 
 from yacut import db
 from yacut.error_handlers import UniqueShortIDError, YacutAppendUrlMapError
-from yacut.models import URLMap
 from yacut.utils import get_random_short_id
 
 
@@ -16,11 +16,15 @@ class YacutBaseModel(db.Model):
     @classmethod
     def get_by_id(cls, id):
         """Возвращает объект по идентификатору."""
-        return cls.query.get_or_404(id)
+        return cls.query.filter_by(id=id).one()
 
     @classmethod
-    def get_records_by_filter(cls, filter):
-        return cls.query.filter_by(**filter)
+    def get_records_by_filter(cls, **filter):
+        """Применяет фильтр к набору данных."""
+        urlmaps = cls.query.filter_by(**filter)
+        if not urlmaps:
+            raise NoResultFound
+        return urlmaps
 
     def save(self):
         """Сохраняет изменения в БД."""
@@ -57,7 +61,7 @@ class URLMap(YacutBaseModel):
     @classmethod
     def get_by_original(cls, original):
         """Возвращает список записей по оригинальной ссылке."""
-        return cls.get_records_by_filter(original=original)
+        return cls.get_records_by_filter(original=original).all()
 
     @classmethod
     def is_short_exists(cls, short):
@@ -83,7 +87,7 @@ class URLMap(YacutBaseModel):
         try:
             if short_id is None:
                 short_id = cls.get_unique_short_id()
-            if cls.is_short_exists(short_id):
+            elif cls.is_short_exists(short_id):
                 raise UniqueShortIDError(short_id)
             urlmap = cls(
                 original=original,

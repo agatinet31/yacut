@@ -1,4 +1,5 @@
 from flask import abort, flash, redirect, render_template
+from sqlalchemy.orm.exc import NoResultFound
 
 from yacut import app
 from yacut.error_handlers import (UniqueShortIDError, YacutAppendUrlMapError,
@@ -22,7 +23,7 @@ def index_view():
         flash(str(exc))
     except YacutAppendUrlMapError:
         app.logger.exception(
-            'Добавление нового сопоставления '
+            'Добавление нового сопоставления, '
             'введеного в форме сервиса не выполнено!'
         )
         abort(500)
@@ -33,8 +34,10 @@ def index_view():
 def redirect_view(custom_id):
     """View функция редиректа по оригинальной ссылке."""
     try:
-        urlmap = URLMap.query.filter_by(short=custom_id).first_or_404()
+        urlmap = URLMap.get_by_short(custom_id)
         return redirect(urlmap.original)
+    except NoResultFound:
+        abort(404)
     except YacutDataBaseError:
         app.logger.exception(
             'Ошибка редиректа при определении оригинальной ссылки '
