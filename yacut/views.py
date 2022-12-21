@@ -13,8 +13,7 @@ def index_view():
     """View функция главной страницы."""
     try:
         form = UrlMapForm()
-        urlmap = None
-        custom_id = (
+        urlmap = (
             URLMap.append_urlmap(
                 form.original_link.data,
                 form.custom_id.data
@@ -30,14 +29,16 @@ def index_view():
             'введеного в форме сервиса не выполнено!'
         )
         abort(500)
-    return render_template('yacut.html', form=form, custom_id=custom_id)
+    return render_template('yacut.html', form=form, urlmap=urlmap)
 
 
 @app.route('/<custom_id>')
 def redirect_view(custom_id):
     """View функция редиректа по оригинальной ссылке."""
     try:
+        app.logger.info(f'short >>>>>   = {custom_id}')
         urlmap = URLMap.get_by_short(custom_id)
+        app.logger.info(f'urlmap !!!!!!!!!!!!!!!!  = {urlmap}')
         return redirect(urlmap.original)
     except NoResultFound:
         abort(404)

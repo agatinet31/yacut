@@ -17,7 +17,8 @@ class YacutBaseModel(db.Model):
     def apply_filter_or_error(cls, **filter):
         """Применяет фильтр к набору данных."""
         query = cls.query.filter_by(**filter)
-        if not query:
+        app.logger.info(f'apply = {query}')
+        if query.first() is None:
             raise NoResultFound
         return query
 
