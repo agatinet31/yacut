@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy.exc import DatabaseError
+from sqlalchemy.exc import DatabaseError, IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 
-from yacut import db
+from yacut import app, db
 from yacut.error_handlers import UniqueShortIDError, YacutAppendUrlMapError
 from yacut.utils import get_random_short_id
 
@@ -14,17 +14,12 @@ class YacutBaseModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     @classmethod
-    def get_by_id(cls, id):
-        """Возвращает объект по идентификатору."""
-        return cls.query.filter_by(id=id).one()
-
-    @classmethod
-    def get_records_by_filter(cls, **filter):
+    def apply_filter_or_error(cls, **filter):
         """Применяет фильтр к набору данных."""
-        urlmaps = cls.query.filter_by(**filter)
-        if not urlmaps:
+        query = cls.query.filter_by(**filter)
+        if not query:
             raise NoResultFound
-        return urlmaps
+        return query
 
     def save(self):
         """Сохраняет изменения в БД."""
@@ -52,27 +47,30 @@ class URLMap(YacutBaseModel):
     original = db.Column(db.String(256))
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    length_short_key = app.config.get('LENGTH_SHORT_KEY', 6)
 
     @classmethod
     def get_by_short(cls, short):
         """Возвращает запись по короткому идентификатору."""
-        query.filter_by
-        return cls.get_records_by_filter(short=short).first()
+        return cls.apply_filter_or_error(short=short).first()
 
     @classmethod
     def get_by_original(cls, original):
         """Возвращает список записей по оригинальной ссылке."""
-        return cls.get_records_by_filter(original=original).all()
+        return cls.apply_filter_or_error(original=original).all()
 
     @classmethod
     def is_short_exists(cls, short):
         """Проверка наличия короткого идентификатора в таблице."""
-        return cls.get_by_short(short) is not None
+        try:
+            return cls.get_by_short(short) is not None
+        except NoResultFound:
+            return False
 
     @classmethod
     def get_unique_short_id(cls):
-        """Возвращает уникальный короткий идентификатор длиной 6 символов."""
-        short_id = get_random_short_id(6)
+        """Возвращает уникальный короткий идентификатор."""
+        short_id = get_random_short_id(cls.length_short_key)
         return (
             short_id
             if not cls.is_short_exists(short_id)
@@ -86,16 +84,17 @@ class URLMap(YacutBaseModel):
         между оригинальной ссылкой и коротким идентификатором.
         """
         try:
-            if short_id is None:
+            if not short_id:
                 short_id = cls.get_unique_short_id()
-            elif cls.is_short_exists(short_id):
-                raise UniqueShortIDError(short_id)
             urlmap = cls(
                 original=original,
                 short=short_id
             )
             urlmap.save()
             return urlmap
+        except IntegrityError as exc:
+            db.session.rollback()
+            raise UniqueShortIDError(short_id) from exc
         except DatabaseError as exc:
             raise YacutAppendUrlMapError(original, short_id) from exc
 

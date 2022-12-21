@@ -3,7 +3,7 @@ from http import HTTPStatus
 from flask import jsonify, render_template
 from sqlalchemy.exc import DatabaseError as YacutDataBaseError
 
-from yacut import app, db
+from yacut import app
 
 
 class InvalidAPIError(Exception):
@@ -59,5 +59,4 @@ def page_not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
-    db.session.rollback()
     return render_template('500.html'), HTTPStatus.INTERNAL_SERVER_ERROR.value

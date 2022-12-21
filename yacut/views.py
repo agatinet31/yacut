@@ -6,7 +6,6 @@ from yacut.error_handlers import (UniqueShortIDError, YacutAppendUrlMapError,
                                   YacutDataBaseError)
 from yacut.forms import UrlMapForm
 from yacut.models import URLMap
-from yacut.utils import append_urlmap
 
 
 @app.route('/', methods=['GET', 'POST'])
@@ -14,11 +13,15 @@ def index_view():
     """View функция главной страницы."""
     try:
         form = UrlMapForm()
-        if form.validate_on_submit():
-            append_urlmap(
+        urlmap = None
+        custom_id = (
+            URLMap.append_urlmap(
                 form.original_link.data,
                 form.custom_id.data
-            )
+            ).short
+            if form.validate_on_submit()
+            else None
+        )
     except UniqueShortIDError as exc:
         flash(str(exc))
     except YacutAppendUrlMapError:
@@ -27,7 +30,7 @@ def index_view():
             'введеного в форме сервиса не выполнено!'
         )
         abort(500)
-    return render_template('yacut.html', form=form)
+    return render_template('yacut.html', form=form, custom_id=custom_id)
 
 
 @app.route('/<custom_id>')

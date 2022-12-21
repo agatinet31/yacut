@@ -38,14 +38,14 @@
         </div>
       </div>
     </div>
-    {% if form.custom_id.data %}
+    {% if custom_id %}
     <div class="container">
       <div class="row ">
         <div class="col-sm"></div>
         <div class="col-sm">
           <p class="text-center">
             <h5 class="text-center">Ваша новая ссылка готова:</h5>            
-            <a href="{{ url_for('redirect_view', custom_id=form.custom_id.data, _external=True) }}">{{ url_for('index_view', _external=True) }}{{ form.custom_id.data }}</a>
+            <a href="{{ url_for('redirect_view', custom_id=custom_id, _external=True) }}">{{ url_for('index_view', _external=True) }}{{ custom_id }}</a>
           </p>
         </div>
         <div class="col-sm"></div>
