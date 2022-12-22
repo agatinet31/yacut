@@ -1,83 +1,65 @@
+import re
+from http import HTTPStatus
+
 from flask import jsonify, request
+from sqlalchemy.orm.exc import NoResultFound
+from werkzeug.exceptions import BadRequest
 
-from . import app, db
-from .error_handlers import InvalidAPIError
-from .models import URLMap
+from yacut import app
+from yacut.error_handlers import InvalidAPIError, YacutDataBaseError, UniqueShortIDError
+from yacut.models import URLMap
 
-"""
-Отсутствует тело запроса
+SHORT_ID_REGEX = re.compile(app.config.get('SHORT_ID_PATTERN'))
 
 
-Cоздание новой короткой ссылки.
+@app.route('/api/id/<short_id>/', methods=['GET'])
+def get_url_map(short_id):
+    """
+    Возвращает оригинальную ссылку по короткому идетификатору.
+    """
+    try:
+        urlmap = URLMap.get_by_short(short_id)
+        return jsonify({'url': urlmap.original}), HTTPStatus.OK.value
+    except NoResultFound:
+        raise InvalidAPIError('Указанный id не найден', HTTPStatus.NOT_FOUND.value)
+    except YacutDataBaseError:
+        error_message = (
+            'Внутреняя ошибка сервиса при определении оригинальной ссылки '
+            f'по короткому идентификатору {short_id}!'
+        )
+        app.logger.exception(error_message)
+        raise InvalidAPIError(error_message, HTTPStatus.INTERNAL_SERVER_ERROR.value)
 
 
 @app.route('/api/id/', methods=['POST'])
 def add_url_map():
+    """
+    Создание отображения между оригинальной ссылкой и коротким идентификатором.
+    """
     try:
         data = request.get_json()
+        assert data is not None
         assert isinstance(data, dict)
-    except:
-        raise InvalidAPIUsage('Получена неверная структура JSON!')
-    if 'title' not in data or 'text' not in data:
-        raise InvalidAPIUsage('В запросе отсутствуют обязательные поля')
-    if Opinion.query.filter_by(text=data['text']).first() is not None:
-        raise InvalidAPIUsage('Такое мнение уже есть в базе данных')
-    opinion = Opinion()
-    opinion.from_dict(data)
-    db.session.add(opinion)
-    db.session.commit()
-    return jsonify({'opinion': opinion.to_dict()}), 201
-
-@app.route('/api/id/<str:short_id>/', methods=['GET'])
-def get_url_map(short_id):
-    opinion = Opinion.query.get(id)
-    if opinion is None:
-        raise InvalidAPIUsage('Мнение с указанным id не найдено', 404)
-    return jsonify({'opinion': opinion.to_dict()}), 200
-
-
-@app.route('/api/opinions/<int:id>/', methods=['PATCH'])
-def update_opinion(id):
-    data = request.get_json()
-    if (
-        'text' in data and 
-        Opinion.query.filter_by(text=data['text']).first() is not None
-    ):
-        raise InvalidAPIUsage('Такое мнение уже есть в базе данных')
-    opinion = Opinion.query.get(id)
-    if opinion is None:
-        raise InvalidAPIUsage('Мнение с указанным id не найдено', 404)
-    opinion.title = data.get('title', opinion.title)
-    opinion.text = data.get('text', opinion.text)
-    opinion.source = data.get('source', opinion.source)
-    opinion.added_by = data.get('added_by', opinion.added_by)
-    db.session.commit()
-    return jsonify({'opinion': opinion.to_dict()}), 201
-
-
-@app.route('/api/opinions/<int:id>/', methods=['DELETE'])
-def delete_opinion(id):
-    opinion = Opinion.query.get(id)
-    if opinion is None:
-        raise InvalidAPIUsage('Мнение с указанным id не найдено', 404)
-    db.session.delete(opinion)
-    db.session.commit()
-    return '', 204
-
-
-@app.route('/api/opinions/', methods=['GET'])
-def get_opinions():
-    opinions = Opinion.query.all()
-    opinions_list = [opinion.to_dict() for opinion in opinions]
-    return jsonify({'opinions': opinions_list}), 200
-
-
-@app.route('/api/get-random-opinion/', methods=['GET'])
-def get_random_opinion():
-    opinion = random_opinion()
-    if opinion is not None:
-        return jsonify({'opinion': opinion.to_dict()}), 200
-    raise InvalidAPIUsage('В базе данных нет мнений', 404)
-
-
-"""
+        if 'url' not in data:
+            raise InvalidAPIError('\"url\" является обязательным полем!')
+        if 'custom_id' in data and not SHORT_ID_REGEX.match(data['custom_id']):
+            raise InvalidAPIError('Указано недопустимое имя для короткой ссылки')
+        urlmap = URLMap.append_urlmap(
+            original=data.get('url'),
+            short_id=data.get('custom_id')
+        )
+        return (
+            jsonify({'url': urlmap.original, 'short_link': urlmap.short}),
+            HTTPStatus.CREATED.value
+        )
+    except (AttributeError, BadRequest):
+        raise InvalidAPIError('Отсутствует тело запроса')
+    except UniqueShortIDError as exc:
+        raise InvalidAPIError(str(exc))
+    except YacutDataBaseError:
+        error_message = (
+            'Внутреняя ошибка сервиса при создании отображения между '
+            f'оригинальной ссылкой {data.get("url")} и коротким идентификатором'
+        )
+        app.logger.exception(error_message)
+        raise InvalidAPIError(error_message, HTTPStatus.INTERNAL_SERVER_ERROR.value)
