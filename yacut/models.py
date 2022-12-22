@@ -1,10 +1,11 @@
 from datetime import datetime
 
-from sqlalchemy.exc import DatabaseError, IntegrityError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm.exc import NoResultFound
 
 from yacut import app, db
-from yacut.error_handlers import UniqueShortIDError, YacutAppendUrlMapError
+from yacut.error_handlers import (UniqueShortIDError, YacutAppendUrlMapError,
+                                  YacutDataBaseError)
 from yacut.utils import get_random_short_id
 
 
@@ -14,18 +15,17 @@ class YacutBaseModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     @classmethod
-    def apply_filter_or_error(cls, **filter):
-        """Применяет фильтр к набору данных."""
-        query = cls.query.filter_by(**filter)
-        app.logger.info(f'apply = {query}')
-        if query.first() is None:
-            raise NoResultFound
-        return query
+    def get_one_or_error(cls, **filter):
+        """Возвращает первую запись из применяемой выборки по фильтру."""
+        return cls.query.filter_by(**filter).one()
 
-    def save(self):
-        """Сохраняет изменения в БД."""
-        db.session.add(self)
-        db.session.commit()
+    @classmethod
+    def get_list_or_error(cls, **filter):
+        """Возвращает список записей из применяемой выборки по фильтру."""
+        records = cls.query.filter_by(**filter).all()
+        if not records:
+            raise NoResultFound
+        return records
 
     def __iter__(self):
         """Итератор полей и их значений."""
@@ -35,12 +35,17 @@ class YacutBaseModel(db.Model):
                 yield attr, values[attr]
 
     def to_dict(self):
-        """Формирование словаря из объекта модели."""
+        """Формирует словарь из объекта модели."""
         return dict(self)
 
     def from_dict(self, data):
-        """Обновление полей модели из словаря."""
+        """Обновляет поля модели из словаря."""
         self.__dict__.update(data)
+
+    def save(self):
+        """Сохраняет изменения в БД."""
+        db.session.add(self)
+        db.session.commit()
 
 
 class URLMap(YacutBaseModel):
@@ -48,21 +53,21 @@ class URLMap(YacutBaseModel):
     original = db.Column(db.String(256))
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-    length_short_key = app.config.get('LENGTH_SHORT_KEY', 6)
+    length_short_key = app.config.get('LENGTH_SHORT_ID', 6)
 
     @classmethod
     def get_by_short(cls, short):
         """Возвращает запись по короткому идентификатору."""
-        return cls.apply_filter_or_error(short=short).first()
+        return cls.get_one_or_error(short=short)
 
     @classmethod
     def get_by_original(cls, original):
         """Возвращает список записей по оригинальной ссылке."""
-        return cls.apply_filter_or_error(original=original).all()
+        return cls.get_list_or_error(original=original)
 
     @classmethod
     def is_short_exists(cls, short):
-        """Проверка наличия короткого идентификатора в таблице."""
+        """Проверка наличия короткого идентификатора."""
         try:
             return cls.get_by_short(short) is not None
         except NoResultFound:
@@ -96,7 +101,7 @@ class URLMap(YacutBaseModel):
         except IntegrityError as exc:
             db.session.rollback()
             raise UniqueShortIDError(short_id) from exc
-        except DatabaseError as exc:
+        except YacutDataBaseError as exc:
             raise YacutAppendUrlMapError(original, short_id) from exc
 
     def __repr__(self):
