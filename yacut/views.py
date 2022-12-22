@@ -39,7 +39,7 @@ def redirect_view(custom_id):
         app.logger.info(f'short >>>>>   = {custom_id}')
         urlmap = URLMap.get_by_short(custom_id)
         app.logger.info(f'urlmap !!!!!!!!!!!!!!!!  = {urlmap}')
-        return redirect(urlmap.original)
+        return redirect(f'http://{urlmap.original}')
     except NoResultFound:
         abort(404)
     except YacutDataBaseError:
