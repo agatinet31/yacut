@@ -1,12 +1,13 @@
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import synonym
 from sqlalchemy.orm.exc import NoResultFound
 
 from yacut import app, db
 from yacut.error_handlers import (UniqueShortIDError, YacutAppendUrlMapError,
                                   YacutDataBaseError)
-from yacut.utils import get_random_short_id
+from yacut.utils import get_obj_value, get_random_short_id
 
 
 class YacutBaseModel(db.Model):
@@ -27,20 +28,16 @@ class YacutBaseModel(db.Model):
             raise NoResultFound
         return records
 
-    def __iter__(self):
-        """Итератор полей и их значений."""
-        values = vars(self)
-        for attr in self.__mapper__.columns.keys():
-            if attr in values:
-                yield attr, values[attr]
-
-    def to_dict(self):
-        """Формирует словарь из объекта модели."""
-        return dict(self)
+    def to_dict(self, keys):
+        """Формирует словарь из объекта модели по ключевым атрибутам."""
+        return dict(get_obj_value(self, keys))
 
     def from_dict(self, data):
-        """Обновляет поля модели из словаря."""
-        self.__dict__.update(data)
+        """Обновляет поля объекта модели из словаря."""
+        assert isinstance(data, dict)
+        for item in data.items():
+            if hasattr(self, item[0]):
+                self.__setattr__(*item)
 
     def save(self):
         """Сохраняет изменения в БД."""
@@ -53,6 +50,9 @@ class URLMap(YacutBaseModel):
     original = db.Column(db.String(256))
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    url = synonym('original')
+    custom_id = synonym('short')
+    short_link = synonym('short')
     length_short_key = app.config.get('LENGTH_SHORT_ID', 6)
 
     @classmethod

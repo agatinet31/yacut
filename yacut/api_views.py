@@ -8,7 +8,6 @@ from werkzeug.exceptions import BadRequest
 from yacut import app
 from yacut.error_handlers import (InvalidAPIError, UniqueShortIDError,
                                   YacutDataBaseError, YacutValidationError)
-from yacut.forms import UrlMapForm
 from yacut.models import URLMap
 
 SHORT_ID_REGEX = re.compile(app.config.get('SHORT_ID_PATTERN'))
@@ -42,11 +41,6 @@ def add_url_map():
         data = request.get_json()
         assert data is not None
         assert isinstance(data, dict)
-        form = UrlMapForm(
-            {'original_link': data[]}
-        )
-        if not form.validate():
-            raise YacutValidationError(form.errors)
         if 'url' not in data:
             raise YacutValidationError('\"url\" является обязательным полем!')
         # if not data['url']
@@ -57,7 +51,7 @@ def add_url_map():
             short_id=data.get('custom_id')
         )
         return (
-            jsonify({'url': urlmap.original, 'short_link': urlmap.short}),
+            jsonify(urlmap.to_dict('url', 'short_link')),
             HTTPStatus.CREATED.value
         )
     except (AssertionError, BadRequest):
