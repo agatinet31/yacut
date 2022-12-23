@@ -6,7 +6,9 @@ from sqlalchemy.orm.exc import NoResultFound
 from werkzeug.exceptions import BadRequest
 
 from yacut import app
-from yacut.error_handlers import InvalidAPIError, YacutDataBaseError, UniqueShortIDError
+from yacut.error_handlers import (InvalidAPIError, UniqueShortIDError,
+                                  YacutDataBaseError, YacutValidationError)
+from yacut.forms import UrlMapForm
 from yacut.models import URLMap
 
 SHORT_ID_REGEX = re.compile(app.config.get('SHORT_ID_PATTERN'))
@@ -40,10 +42,16 @@ def add_url_map():
         data = request.get_json()
         assert data is not None
         assert isinstance(data, dict)
+        form = UrlMapForm(
+            {'original_link': data[]}
+        )
+        if not form.validate():
+            raise YacutValidationError(form.errors)
         if 'url' not in data:
-            raise InvalidAPIError('\"url\" является обязательным полем!')
+            raise YacutValidationError('\"url\" является обязательным полем!')
+        # if not data['url']
         if 'custom_id' in data and not SHORT_ID_REGEX.match(data['custom_id']):
-            raise InvalidAPIError('Указано недопустимое имя для короткой ссылки')
+            raise YacutValidationError('Указано недопустимое имя для короткой ссылки')
         urlmap = URLMap.append_urlmap(
             original=data.get('url'),
             short_id=data.get('custom_id')
@@ -52,9 +60,9 @@ def add_url_map():
             jsonify({'url': urlmap.original, 'short_link': urlmap.short}),
             HTTPStatus.CREATED.value
         )
-    except (AttributeError, BadRequest):
+    except (AssertionError, BadRequest):
         raise InvalidAPIError('Отсутствует тело запроса')
-    except UniqueShortIDError as exc:
+    except (YacutValidationError, UniqueShortIDError) as exc:
         raise InvalidAPIError(str(exc))
     except YacutDataBaseError:
         error_message = (

@@ -47,6 +47,11 @@ class YacutAppendUrlMapError(YacutDataBaseError):
         )
 
 
+class YacutValidationError(Exception):
+    """Класс исключения валидации."""
+    pass
+
+
 @app.errorhandler(InvalidAPIError)
 def invalid_api_usage(error):
     return jsonify(error.to_dict()), error.status_code
