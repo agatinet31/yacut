@@ -1,4 +1,3 @@
-import re
 from http import HTTPStatus
 
 from flask import jsonify, request
@@ -10,8 +9,6 @@ from yacut.error_handlers import (InvalidAPIError, UniqueShortIDError,
                                   YacutDataBaseError, YacutValidationError)
 from yacut.models import URLMap
 
-SHORT_ID_REGEX = re.compile(app.config.get('SHORT_ID_PATTERN'))
-
 
 @app.route('/api/id/<short_id>/', methods=['GET'])
 def get_url_map(short_id):
@@ -20,7 +17,7 @@ def get_url_map(short_id):
     """
     try:
         urlmap = URLMap.get_by_short(short_id)
-        return jsonify({'url': urlmap.original}), HTTPStatus.OK.value
+        return jsonify(urlmap.to_dict('url')), HTTPStatus.OK.value
     except NoResultFound:
         raise InvalidAPIError('Указанный id не найден', HTTPStatus.NOT_FOUND.value)
     except YacutDataBaseError:
@@ -41,15 +38,8 @@ def add_url_map():
         data = request.get_json()
         assert data is not None
         assert isinstance(data, dict)
-        if 'url' not in data:
-            raise YacutValidationError('\"url\" является обязательным полем!')
-        # if not data['url']
-        if 'custom_id' in data and not SHORT_ID_REGEX.match(data['custom_id']):
-            raise YacutValidationError('Указано недопустимое имя для короткой ссылки')
-        urlmap = URLMap.append_urlmap(
-            original=data.get('url'),
-            short_id=data.get('custom_id')
-        )
+        app.logger.info(data)
+        urlmap = URLMap.append_urlmap(**data)
         return (
             jsonify(urlmap.to_dict('url', 'short_link')),
             HTTPStatus.CREATED.value

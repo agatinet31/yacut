@@ -1,8 +1,8 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField, URLField
-from wtforms.validators import URL, DataRequired, Length, Regexp
+from wtforms.validators import DataRequired, Length, Regexp
 
-from yacut import app
+from yacut.validators import SHORT_ID_REGEX, URL_REGEX
 
 
 class UrlMapForm(FlaskForm):
@@ -16,7 +16,10 @@ class UrlMapForm(FlaskForm):
                 max=256,
                 message='Длина ссылки не более 256 символов'
             ),
-            URL(message='Поле должно содержать URL адрес')
+            Regexp(
+                URL_REGEX,
+                message='Поле должно содержать URL адрес'
+            )
         ]
     )
     custom_id = StringField(
@@ -27,7 +30,7 @@ class UrlMapForm(FlaskForm):
                 message='Длина короткого идентификатора не более 16 символов'
             ),
             Regexp(
-                app.config.get('SHORT_ID_PATTERN'),
+                SHORT_ID_REGEX,
                 message='Короткий идентификатор должен содержать только латинские буквы или цифры'
             )
         ]

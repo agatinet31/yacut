@@ -1,13 +1,14 @@
 from datetime import datetime
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import synonym
+from sqlalchemy.orm import synonym, validates
 from sqlalchemy.orm.exc import NoResultFound
 
 from yacut import app, db
 from yacut.error_handlers import (UniqueShortIDError, YacutAppendUrlMapError,
-                                  YacutDataBaseError)
+                                  YacutDataBaseError, YacutValidationError)
 from yacut.utils import get_obj_value, get_random_short_id
+from yacut.validators import SHORT_ID_REGEX, URL_REGEX
 
 
 class YacutBaseModel(db.Model):
@@ -28,32 +29,64 @@ class YacutBaseModel(db.Model):
             raise NoResultFound
         return records
 
-    def to_dict(self, keys):
+    def to_dict(self, *keys):
         """Формирует словарь из объекта модели по ключевым атрибутам."""
-        return dict(get_obj_value(self, keys))
+        return dict(get_obj_value(self, *keys))
 
-    def from_dict(self, data):
+    def from_dict(self, **data):
         """Обновляет поля объекта модели из словаря."""
-        assert isinstance(data, dict)
         for item in data.items():
             if hasattr(self, item[0]):
                 self.__setattr__(*item)
 
     def save(self):
         """Сохраняет изменения в БД."""
-        db.session.add(self)
-        db.session.commit()
+        try:
+            db.session.add(self)
+            db.session.commit()
+        except YacutDataBaseError:
+            db.session.rollback()
+            raise
 
 
 class URLMap(YacutBaseModel):
     """Класс модели отображения коротких ссылок."""
-    original = db.Column(db.String(256))
+    original = db.Column(
+        db.String(256),
+        index=True,
+        nullable=False,
+        default=''
+    )
     short = db.Column(db.String(16), unique=True)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     url = synonym('original')
     custom_id = synonym('short')
     short_link = synonym('short')
     length_short_key = app.config.get('LENGTH_SHORT_ID', 6)
+
+    @validates('original')
+    def validate_original(self, key, original):
+        if not original:
+            raise AssertionError('\"url\" является обязательным полем!')
+        assert isinstance(original, str), 'Оригинальная ссылка - строка.'
+        assert len(original) <= 256, (
+            'Длина оригинальной ссылки не более 256 символов.'
+        )
+        if URL_REGEX.match(original) is None:
+            raise ValueError(
+                f'{original} Оригинальная ссылка не соответствует шаблону url адреса!'
+            )
+        return 'hren'
+
+    @validates('short')
+    def validate_short(self, key, short):
+        assert isinstance(short, str), 'Короткая ссылка - строка.'
+        assert len(short) <= 16, (
+            'Длина короткой ссылки не более 16 симоволов.'
+        )
+        if SHORT_ID_REGEX.match(short) is None:
+            raise ValueError('Указано недопустимое имя для короткой ссылки')
+        return short
 
     @classmethod
     def get_by_short(cls, short):
@@ -84,25 +117,32 @@ class URLMap(YacutBaseModel):
         )
 
     @classmethod
-    def append_urlmap(cls, original, short_id=None):
+    def append_urlmap(cls, **data):
         """
         Добавление нового сопоставления
         между оригинальной ссылкой и коротким идентификатором.
+
+        except IntegrityError as exc:
+            # raise UniqueShortIDError(urlmap.short) from exc
+            raise UniqueShortIDError(str(exc)) from exc
+
         """
         try:
-            if not short_id:
-                short_id = cls.get_unique_short_id()
-            urlmap = cls(
-                original=original,
-                short=short_id
-            )
+            urlmap = cls()
+            urlmap.from_dict(**data)
+            if not urlmap.short:
+                urlmap.short = cls.get_unique_short_id()
             urlmap.save()
             return urlmap
-        except IntegrityError as exc:
-            db.session.rollback()
-            raise UniqueShortIDError(short_id) from exc
+        except (AssertionError, ValueError) as exc:
+            raise YacutValidationError(str(exc)) from exc
         except YacutDataBaseError as exc:
-            raise YacutAppendUrlMapError(original, short_id) from exc
+            raise YacutValidationError(str(exc)) from exc
+            """
+            raise YacutAppendUrlMapError(
+                urlmap.original, urlmap.short
+            ) from exc
+            """
 
     def __repr__(self):
         """Возвращает строковое представление объекта."""

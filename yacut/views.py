@@ -18,8 +18,8 @@ def index_view():
         urlmap = None
         if form.validate_on_submit():
             urlmap = URLMap.append_urlmap(
-                form.original_link.data,
-                form.custom_id.data
+                original=form.original_link.data,
+                short=form.custom_id.data
             )
     except UniqueShortIDError as exc:
         flash(str(exc))
