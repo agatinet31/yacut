@@ -38,7 +38,6 @@ def add_url_map():
         data = request.get_json()
         assert data is not None
         assert isinstance(data, dict)
-        app.logger.info(data)
         urlmap = URLMap.append_urlmap(**data)
         return (
             jsonify(urlmap.to_dict('url', 'short_link')),

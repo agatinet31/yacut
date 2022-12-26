@@ -15,7 +15,6 @@ def get_random_short_id(length_short_id: int) -> str:
 
 def get_obj_value(obj: Any, *keys: str) -> Tuple[str, Any]:
     """Генератор наименования и значений атрибутов объекта по списку ключей."""
-    tuple
     for name in keys:
         try:
             yield name, getattr(obj, name)

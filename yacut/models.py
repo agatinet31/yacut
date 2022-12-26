@@ -1,6 +1,8 @@
 from datetime import datetime
 
+from flask import url_for
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.declarative import synonym_for
 from sqlalchemy.orm import synonym, validates
 from sqlalchemy.orm.exc import NoResultFound
 
@@ -62,12 +64,14 @@ class URLMap(YacutBaseModel):
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     url = synonym('original')
     custom_id = synonym('short')
-    short_link = synonym('short')
     length_short_key = app.config.get('LENGTH_SHORT_ID', 6)
     import_key = ('url', 'custom_id')
 
-    def __init__(self, **data):
-        self.from_dict(**data)
+    @synonym_for('short')
+    @property
+    def short_link(self):
+        """Возвращает короткую ссылку."""
+        return f'{url_for("index_view", _external=True)}{self.short}'
 
     @validates('original')
     def validate_original(self, key, original):
@@ -127,7 +131,8 @@ class URLMap(YacutBaseModel):
         между оригинальной ссылкой и коротким идентификатором.
         """
         try:
-            urlmap = cls(**data)
+            urlmap = cls()
+            urlmap.from_dict(**data)
             urlmap.save()
             return urlmap
         except (AssertionError, ValueError) as exc:

@@ -25,7 +25,7 @@ class UniqueShortIDError(Exception):
     def __init__(self, short_id):
         self.short_id = short_id
         super().__init__(
-            f'Имя {short_id} уже занято!'
+            f'Имя "{short_id}" уже занято.'
         )
 
 

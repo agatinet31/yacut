@@ -18,11 +18,11 @@ def index_view():
         urlmap = None
         if form.validate_on_submit():
             urlmap = URLMap.append_urlmap(
-                original=form.original_link.data,
-                short=form.custom_id.data
+                url=form.original_link.data,
+                custom_id=form.custom_id.data
             )
     except UniqueShortIDError as exc:
-        flash(str(exc))
+        flash(f'Имя {exc.short_id} уже занято!')
     except YacutAppendUrlMapError:
         app.logger.exception(
             'Добавление нового сопоставления, '
